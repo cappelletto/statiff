@@ -26,6 +26,13 @@ args::ValueFlag	<std::string> 	argOutput(argParser,    "output",   "Output file"
 args::ValueFlag	<int> 	        argVerbose(argParser,   "verbose",  "Define verbosity level",                                                   {"verbose"});
 // Free parameters for debugging
 args::ValueFlag	<int> 	argNThreads(argParser,  "nthreads", "Number of multithread workers. Used as a hint for OpenMP parallel blocks",  {"int"});
+// Histogram related parameters
+args::ValueFlag	<double> argHistMin(argParser,  "min_value", "Lower limit of the histogram range. Default = 0.0",  {"hmin"});
+args::ValueFlag	<double> argHistMax(argParser,  "max_value", "Upper limit for the histogram range. Default = 1.0",  {"hmax"});
+args::ValueFlag	<unsigned int> 	 argHistBin(argParser,  "N",   "Number of historam bins. Default = 100",  {"nbins"});
+
+args::ValueFlag	<int> 	argNoHeader(argParser,  "flag",    "Disable exporting header row containing information about each column. It will export just the data",  {"noheader"});
+
 args::ValueFlag	<int> 	argIntParam(argParser,  "param",    "User defined parameter INTEGER for testing purposes",  {"int"});
 args::ValueFlag	<float> argFloatParam(argParser,"param",    "User defined parameter FLOAT for testing purposes",    {"float"});
 

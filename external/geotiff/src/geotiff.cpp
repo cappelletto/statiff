@@ -136,9 +136,9 @@ int *Geotiff::GetDimensions() {
     *  This function returns a pointer to an array of 3 integers 
     *  holding the dimensions of the Geotiff. The array holds the 
     *  dimensions in the following order:
-    *   (1) number of columns (x size)
-    *   (2) number of rows (y size)
-    *   (3) number of bands (number of bands, z dimension)
+    *   (0) number of columns (x size)
+    *   (1) number of rows (y size)
+    *   (2) number of bands (number of bands, z dimension)
     */
   dimensions[0] = nCols; 
   dimensions[1] = nRows;
