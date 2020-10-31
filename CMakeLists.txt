@@ -27,25 +27,6 @@ message(STATUS "GDAL library status:")
 message(STATUS "    libraries: ${GDAL_LIBRARY}")
 message(STATUS "    include path: ${GDAL_INCLUDE_DIR}")
 
-# Find OpenCV, you may need to set OpenCV_DIR variable
-# to the absolute path to the directory containing OpenCVConfig.cmake file
-# Being honest, we could do it with 3.4.X but for future compatibility we should push to the latest LTS release (4.2)
-find_package(OpenCV 4.2 REQUIRED
-                        NO_MODULE
-                        PATHS /usr/local
-                        NO_DEFAULT_PATH)
-
-# If the package has been found, several variables will
-# be set, you can find the full list with descriptions
-# in the OpenCVConfig.cmake file.
-# Print some message showing some of them
-# At this level, it should be useful to check minimum required version or exact version
-# So far, there are still some issues with OpenCV installations included in ROS
-message(STATUS "OpenCV library status:")
-message(STATUS "    version: ${OpenCV_VERSION}")
-message(STATUS "    libraries: ${OpenCV_LIBS}")
-message(STATUS "    include path: ${OpenCV_INCLUDE_DIRS}")
-
 # Boost and its components
 find_package( Boost REQUIRED )
 
@@ -84,6 +65,6 @@ add_executable(statiff    src/statiff.cpp
 #message (${yaml-cpp_INCLUDE_DIRS})
 
 target_compile_options(statiff PUBLIC -std=c++14)
-target_link_libraries(statiff ${OpenCV_LIBS} ${GDAL_LIBRARY})
+target_link_libraries(statiff ${GDAL_LIBRARY})
 
 install (TARGETS statiff DESTINATION $ENV{HOME}/bin)

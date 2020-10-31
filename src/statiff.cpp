@@ -16,6 +16,7 @@
 #include "geotiff.hpp" // Geotiff class definitions
 
 using namespace std;
+using namespace chrono;
 using namespace statiff;
 // using namespace cv;
 
@@ -121,34 +122,70 @@ int main(int argc, char *argv[])
     cout << "\t\t> Nominal area:\t[" << cyan << xSize*ySize*xResolution*yResolution << reset << "] m2" << endl;
     cout << "\tNo data:         \t[" << (bGotNodata ? green : red) << dfNoData << reset << "]" << endl;
 
-    logc.info ("geotiff", "Reading");
+    logc.debug ("geotiff", "Loading geoTIFF data into memory. This may take a while ...");
+    //let's benchmark reading time
+    auto chrono_start = high_resolution_clock::now(); 
+
     // load data into memory
     float **apData; //pull 2D float matrix containing the image data for Band 1
     apData = inputGeotiff.GetRasterBand(1);
 
-    double acum = 0;
+    auto chrono_stop     = high_resolution_clock::now(); 
+    auto chrono_duration = duration_cast<milliseconds>(chrono_stop - chrono_start); 
+    
+    s << "Ellapsed time reading geoTIFF: " << blue << (chrono_duration.count()/1000.0) << reset << " seconds...";
+    logc.info ("time", s);
+
+    double acum = 0.0;
     int nodataCount = 0;
     double dataCount = 0;
+    double _min, _max; // we cannot retrieve them from the data matrix because we need to remove first the nodata fields
+    chrono_start = high_resolution_clock::now();
+    double delta = (histMax - histMin)/(double) nBins;
+    vector<double> v(xSize*ySize/2); //let's preallocate half of the required memory to avoid triggered realloc during exec
 
+    vector<int> histogram(nBins, 0);    //histogram
+    // double z;    // too much overhead multithreading, not worth creating too many workers
+    // #pragma omp for reduction(+:acum)
     for (int row = 0; row < ySize; row++){
         for (int col = 0; col < xSize; col++){
             double z = apData[row][col];
+            // z = apData[row][col];
             if (z != dfNoData){
-                acum += z;
-                dataCount++;
+                v.push_back(z);  // push into the vector
+                acum += z;  // increase accumulator (to compute mean value)
+                dataCount++;// increase counter of valid points, should match v.size() by the end
+                // let's compute the corresponding bin
+                int bin;
+                if      (z < histMin) bin = 0;       // cap min
+                else if (z > histMax) bin = nBins-1; // cap max
+                else{
+                    bin = floor((z - histMin)/delta);
+                }
+                // cout << bin << " ";
+                histogram[bin] = histogram[bin] + 1;
             }
             else{
-                nodataCount++;
+                nodataCount++;// increase counter of nodata pixels. It must match TotalPixel - v.size()
             }
         }
     }
 
-    acum /= dataCount;
+    chrono_stop = high_resolution_clock::now();
+    chrono_duration = duration_cast< milliseconds>(chrono_stop - chrono_start); 
+    s << "Ellapsed time processing data: " << blue << chrono_duration.count() << reset << " milliseconds...";
+    logc.info ("time", s);
 
+    acum /= dataCount;
 
     cout << "Total of no_data:\t" << nodataCount << endl;
     cout << "Total of data:\t" << dataCount << endl;
     cout << "Mean value:\t" << acum << endl;
+
+
+    cout << "Histogram: " << endl;
+    for (auto x:histogram)
+        cout << x << " ";
 
 	return 0;
 

@@ -22,15 +22,6 @@
 #include <chrono>
 #include <omp.h>
 /// OpenCV libraries. May need review for the final release
-#include <opencv2/core.hpp>
-#include "opencv2/core/ocl.hpp"
-#include "opencv2/imgproc.hpp"
-#include "opencv2/highgui.hpp"
-#include <opencv2/video.hpp>
-#include <opencv2/features2d.hpp>
-#include "opencv2/calib3d.hpp"
-#include <opencv2/xfeatures2d.hpp>
-
 /// CUDA specific libraries
 // #if USE_GPU
 //     #include <opencv2/cudafilters.hpp>
