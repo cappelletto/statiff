@@ -38,6 +38,7 @@
 //     #include "opencv2/xfeatures2d/cuda.hpp"
 // #endif
 #include "geotiff.hpp"
+#include "statiff.hpp"
 
 const std::string red("\033[1;31m");
 const std::string green("\033[1;32m");
@@ -56,24 +57,6 @@ const std::string light_cyan("\033[0;36m");
 const std::string reset("\033[0m");
 const std::string highlight("\033[30;43m");
 
-#define LO_NPART  5
 #define DEFAULT_NTHREADS 12
-
-#define DEFAULT_OUTPUT_FILE "LAD_output.tif"
-#define DEFAULT_WINDOW_WIDTH 800
-#define DEFAULT_WINDOW_HEIGHT 600
-#define WATER_DENSITY 1025 // kg / m3
-#define GRAVITY       9.81 // kg * m / s2
-
-#include <CGAL/Simple_cartesian.h>
-#include <CGAL/linear_least_squares_fitting_3.h>
-#include <CGAL/Polyhedron_3.h>
-
-typedef CGAL::Simple_cartesian<double>  K;          // redefinition to avoid name clashing with OpenCV
-typedef K::Vector_3                     KVector;
-typedef K::Line_3                       KLine;
-typedef K::Plane_3                      KPlane;
-typedef K::Point_3                      KPoint;
-typedef K::Triangle_3                   KTriangle;
 
 #endif // _PROJECT_HEADERS_H_

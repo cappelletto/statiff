@@ -76,13 +76,14 @@ add_definitions( -DGIT_COMMIT="${GIT_INFO}" ) # Forward current git info as a si
 
 ############################ MAD_TEST ####################
 add_executable(statiff    src/statiff.cpp
+                          src/helper.cpp
                           ${GEOTIFF_MODULE}/src/geotiff.cpp
                           ${PROJECT_HEADERS})
 
 #find_path(yaml-cpp_INCLUDE_DIRS yaml-cpp/yaml.h )
 #message (${yaml-cpp_INCLUDE_DIRS})
 
-target_compile_options(stat_tiff PUBLIC -std=c++14)
-target_link_libraries(stat_tiff ${OpenCV_LIBS} ${GDAL_LIBRARY} yaml-cpp)
+target_compile_options(statiff PUBLIC -std=c++14)
+target_link_libraries(statiff ${OpenCV_LIBS} ${GDAL_LIBRARY})
 
 install (TARGETS statiff DESTINATION $ENV{HOME}/bin)
