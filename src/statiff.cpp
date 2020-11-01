@@ -138,15 +138,14 @@ int main(int argc, char *argv[])
 
     double acum = 0.0;
     int nodataCount = 0;
-    double dataCount = 0;
     double _min, _max; // we cannot retrieve them from the data matrix because we need to remove first the nodata fields
-    chrono_start = high_resolution_clock::now();
     double delta = (histMax - histMin)/(double) nBins;
-    vector<double> v(xSize*ySize/2); //let's preallocate half of the required memory to avoid triggered realloc during exec
-
+    vector<double> v; //let's preallocate half of the required memory to avoid triggered realloc during exec
+    v.reserve(xSize*ySize/2);
     vector<int> histogram(nBins, 0);    //histogram
     // double z;    // too much overhead multithreading, not worth creating too many workers
     // #pragma omp for reduction(+:acum)
+    chrono_start = high_resolution_clock::now();
     for (int row = 0; row < ySize; row++){
         for (int col = 0; col < xSize; col++){
             double z = apData[row][col];
@@ -154,11 +153,10 @@ int main(int argc, char *argv[])
             if (z != dfNoData){
                 v.push_back(z);  // push into the vector
                 acum += z;  // increase accumulator (to compute mean value)
-                dataCount++;// increase counter of valid points, should match v.size() by the end
                 // let's compute the corresponding bin
                 int bin;
-                if      (z < histMin) bin = 0;       // cap min
-                else if (z > histMax) bin = nBins-1; // cap max
+                if      (z <= histMin) bin = 0;       // cap min
+                else if (z >= histMax) bin = nBins-1; // cap max
                 else{
                     bin = floor((z - histMin)/delta);
                 }
@@ -176,11 +174,34 @@ int main(int argc, char *argv[])
     s << "Ellapsed time processing data: " << blue << chrono_duration.count() << reset << " milliseconds...";
     logc.info ("time", s);
 
-    acum /= dataCount;
+    double mean = acum/v.size();
+    double variance =0;
+    acum = 0;
+    // Now, having the mean, we can compute the stdev (first the variance)
+
+    _min = _max = v[0]; // we use the first value as seed for min/max extraction
+    for (auto z:v){
+        double dist = z - mean;
+        acum += dist*dist; // acum to the variance
+        if (z < _min)       _min = z; //let's update the min
+        else if (z > _max)  _max = z; //let's update the max
+    }
+    variance = acum / v.size(); // no Bessel correction because we are using the entire population
+    double stdev = sqrt(variance); 
+
+    // partial sort is o(N) linear complexity, guarantees the midpoitn element of the array
+    std::nth_element(v.begin(), v.begin() + v.size()/2, v.end());
+    double median = v[v.size()/2];
 
     cout << "Total of no_data:\t" << nodataCount << endl;
-    cout << "Total of data:\t" << dataCount << endl;
-    cout << "Mean value:\t" << acum << endl;
+    // cout << "Total of data:\t" << dataCount << endl;
+    cout << "Vector size:\t" << v.size() << endl;
+    cout << "Mean value:\t" << mean << endl;
+    cout << "Variance value:\t" << variance << endl;
+    cout << "Stdev:\t" << stdev << endl;
+    cout << reset << "Median value:\t" << median << endl;
+    cout << "Min value:\t" << _min << endl;
+    cout << "Max value:\t" << _max << endl;
 
 
     cout << "Histogram: " << endl;
@@ -188,23 +209,6 @@ int main(int argc, char *argv[])
         cout << x << " ";
 
 	return 0;
-
-
-    //CHECK PARAMETERS
-    
-    //PRINT SUMMARY
-
-    //PRE-ALLOCATE VECTOR
-
-    // FOR EACH ROW, COMPUTE:
-        // Z <- READ PIXEL
-        // CHECK IF DATA/NO_DATA
-        // MIN, MAX, ACUM
-        // B <-PARITTION BIN
-        // UPDATE HIST(B)
-    // NEXT
-
-    // COMPUTE TOTAL AREA
 
     // FOR (Z:VECTOR)
         // DIST = Z - MEAN
