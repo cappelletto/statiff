@@ -192,10 +192,14 @@ int main(int argc, char *argv[])
     // partial sort is o(N) linear complexity, guarantees the midpoitn element of the array
     std::nth_element(v.begin(), v.begin() + v.size()/2, v.end());
     double median = v[v.size()/2];
+    double area = v.size()*xResolution*yResolution;
 
+    // TODO: improve screen output
+    // PRINT SUMMARY ON SCREEN
     cout << "Total of no_data:\t" << nodataCount << endl;
     // cout << "Total of data:\t" << dataCount << endl;
     cout << "Vector size:\t" << v.size() << endl;
+    cout << "Actual area:\t" << area << endl;
     cout << "Mean value:\t" << mean << endl;
     cout << "Variance value:\t" << variance << endl;
     cout << "Stdev:\t" << stdev << endl;
@@ -203,26 +207,25 @@ int main(int argc, char *argv[])
     cout << "Min value:\t" << _min << endl;
     cout << "Max value:\t" << _max << endl;
 
-
     cout << "Histogram: " << endl;
     for (auto x:histogram)
         cout << x << " ";
 
-	return 0;
-
-    // FOR (Z:VECTOR)
-        // DIST = Z - MEAN
-        // VARIANCE_ACUM += DIST
-    // NEXT
-
-    // STDEV = SQRT(VARIANCE_ACUM)
-
-    // SORT (V.BEING, V.END)
-    // MEDIAN <- V.MIDDLE
-
     // DUMP TO OUTPUT FILE
-    // PRINT SUMMARY ON SCREEN
-    //------------>END
+    std::ofstream outFile(outputFileName);
+    
+    if (!argNoHeader){
+        outFile << "Filename\tNODATA\tXresolution\tYresolution\tPixel\tArea_m2\tMin\tMax\tMean\tMedian\tStdev\tHist_min\tHist_max\tBins";
+        for (int i=0; i < nBins; i++)
+            outFile << "\tbin_" << i;
+        outFile << endl;
+    }
+    outFile << outputFileName << "\t" << dfNoData << "\t" << xResolution << "\t" << yResolution << "\t" << v.size() << "\t" << area;
+    outFile << "\t" << _min << "\t" << _max << "\t" << mean << "\t" << median << "\t" << stdev << "\t" << histMin << "\t" << histMax << "\t" << nBins;
+    for (int i=0; i < nBins; i++)
+        outFile << "\t" << histogram[i];
+    outFile << endl;
 
+    //------------>END
     return ErrorCode::NO_ERROR; // everything went smooth
 }
