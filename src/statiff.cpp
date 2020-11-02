@@ -247,20 +247,20 @@ int main(int argc, char *argv[])
     // ****************************************************************************************
     std::ofstream outFile("STAT_" + outputFileName);
     if (!argNoHeader){ // generate header
-        outFile << "Filename\tNODATA\tXresolution\tYresolution\tN_Pixels\tArea_m2\tMin\tMax\tMean\tMedian\tStdev\tHist_min\tHist_max\tBins";
+        outFile << "Filename\tNODATA\tXresolution\tYresolution\tN_Pixels\tArea_m2\tMin\tMax\tMean\tMedian\tStdev\tKurtosis\tSkew\tHist_min\tHist_max\tBins";
         // for (int i=0; i < nBins; i++)
         //     outFile << "\tbin_" << i;
         outFile << endl;
     }
     outFile << outputFileName << "\t" << dfNoData << "\t" << xResolution << "\t" << yResolution << "\t" << N << "\t" << area;
-    outFile << "\t" << _min << "\t" << _max << "\t" << mean << "\t" << median << "\t" << stdev << "\t" << histMin << "\t" << histMax << "\t" << nBins;
+    outFile << "\t" << _min << "\t" << _max << "\t" << mean << "\t" << median << "\t" << stdev << "\t" << kurtosis << "\t" << skew << "\t" << histMin << "\t" << histMax << "\t" << nBins;
     // for (int i=0; i < nBins; i++)
     //     outFile << "\t" << histogram[i];
     outFile << endl;
 
     // Now we repeat the row-entry for Non-Zero stats
     outFile << "ZEROES_REMOVED" << "\t" << dfNoData << "\t" << xResolution << "\t" << yResolution << "\t" << v.size() << "\t" << area_nz;
-    outFile << "\t" << _min << "\t" << _max << "\t" << mean_nz << "\t" << median_nz << "\t" << stdev_nz << "\t" << histMin << "\t" << histMax << "\t" << nBins;
+    outFile << "\t" << _min << "\t" << _max << "\t" << mean_nz << "\t" << median_nz << "\t" << stdev_nz << "\t" << kurtosis_nz << "\t" << skew_nz << "\t" << histMin << "\t" << histMax << "\t" << nBins;
     // for (int i=0; i < nBins; i++){
     //     if (i==0) histogram[i] = 0;     // we erase all ZERO entries in the histogram before exporting it
     //     outFile << "\t" << histogram[i];
