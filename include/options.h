@@ -86,10 +86,8 @@ int initParser(int argc, char *argv[]){
     }
 
     cout << cyan << "statiff" << reset << endl; // CREATE OUTPUT TEMPLATE STRING
-    // cout << "\tOpenCV version:\t" << yellow << CV_VERSION << reset << endl;
-    cout << "\tGit commit:\t" << yellow << GIT_COMMIT << reset << endl
-         << endl;
-    cout << "\tBuilt:\t" << __DATE__ << " - " << __TIME__ << endl;   // TODO: solve, make is complaining about this
+    cout << "\tGit commit:\t" << yellow << GIT_COMMIT << reset << endl;
+    cout << "\tBuilt:\t" << __DATE__ << " - " << __TIME__ << endl;
     return 0;
 }
 

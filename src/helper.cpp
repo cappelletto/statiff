@@ -19,12 +19,10 @@ using namespace std;
 std::string makeFixedLength(const int i, const int length)
 {
     std::ostringstream ostr;
-
     if (i < 0)
         ostr << '-';
 
     ostr << std::setfill('0') << std::setw(length) << (i < 0 ? -i : i);
-
     return ostr.str();
 }
 

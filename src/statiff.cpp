@@ -32,13 +32,8 @@ int main(int argc, char *argv[])
     if (retval != 0)  // some error ocurred, we have been signaled to stop
         return retval;
     std::ostringstream s;
-    // Parameters hierarchy
-    // ARGS > CONFIG > DEFAULT (this)
-    // Input file priority: must be defined either by the config.yaml or --input argument
     string  inputFileName    = ""; // command arg or config defined
     string outputFileName    = ""; // command arg or config defined
-    // string outputFilePrefix  = ""; // none, output filenames will be the same as the standard
-    // string outputFilePath    = ""; // same relative folder
 
     if (argInput) inputFileName = args::get(argInput); //input file is mandatory argument.
     if (inputFileName.empty()){ //not defined as command line argument? let's use config.yaml definition
@@ -56,7 +51,7 @@ int main(int argc, char *argv[])
 
     int nThreads = DEFAULT_NTHREADS;
     double histMin = 0.0, histMax = 1.0;
-    unsigned int nBins = 100;
+    int nBins = 100;
 
     if (argNThreads) nThreads = args::get(argNThreads);
     if (argHistMax)   histMax = args::get(argHistMax);
@@ -69,7 +64,7 @@ int main(int argc, char *argv[])
         return statiff::INVALID_ARG;
     }
     
-    if (nBins == 0){
+    if (nBins <= 0){
         s << "Number of bins nBins[" << yellow << nBins << reset << "] must be positive integer";
         logc.error("main", s);
         return statiff::INVALID_ARG;
@@ -87,7 +82,6 @@ int main(int argc, char *argv[])
     Geotiff inputGeotiff (inputFileName.c_str());
     if (!inputGeotiff.isValid()){ // check if nothing wrong happened with the constructor
         s << "Error opening geoTIFF file [" << inputFileName << "] via Geotiff class";
-
         return statiff::INVALID_DATA;
     }
 
@@ -103,7 +97,7 @@ int main(int argc, char *argv[])
     int ySize = poDataset->GetRasterYSize();
     // pixel resolution
     double xResolution, yResolution;
-	double adfGeoTransform[6];
+	double adfGeoTransform[6]; // 6-DOF geoTIFF params: center, resolution, rotation...
 	if( poDataset->GetGeoTransform( adfGeoTransform ) == CE_None )
 	{
 	    xResolution = fabs(adfGeoTransform[1]);
@@ -113,10 +107,10 @@ int main(int argc, char *argv[])
     int bGotNodata = 0;
     double dfNoData = GDALGetRasterNoDataValue (GDALGetRasterBand( poDataset, 1 ), &bGotNodata);
     if (!bGotNodata){
-        logc.warn ("main", "NODATA field not available in the raster input. Using default value [0]");
-        dfNoData = 0.0;
+        logc.warn ("main", "NODATA field not available in the raster input. Using as default value [-9999]");
+        dfNoData = -9999.0;
     }
-    logc.debug("geotiff", "geoTIFF summary information: ****************************************");
+    logc.debug("geotiff", "geoTIFF summary information: *****************************************");
     cout << "\tCanvas size:     \t[" << xSize << " x " << ySize << "] = [" << yellow << xSize * ySize << reset << "] pixels" << endl;
     cout << "\tPixel resolution:\t[" << yellow << xResolution << " x " << yResolution << reset << "] meter / pixel" << endl;
     cout << "\t\t> Nominal area:\t[" << cyan << xSize*ySize*xResolution*yResolution << reset << "] m2" << endl;
@@ -125,24 +119,25 @@ int main(int argc, char *argv[])
     logc.debug ("geotiff", "Loading geoTIFF data into memory. This may take a while ...");
     //let's benchmark reading time
     auto chrono_start = high_resolution_clock::now(); 
-
     // load data into memory
     float **apData; //pull 2D float matrix containing the image data for Band 1
     apData = inputGeotiff.GetRasterBand(1);
-
     auto chrono_stop     = high_resolution_clock::now(); 
     auto chrono_duration = duration_cast<milliseconds>(chrono_stop - chrono_start); 
-    
-    s << "Ellapsed time reading geoTIFF: " << blue << (chrono_duration.count()/1000.0) << reset << " seconds...";
+        s << "Ellapsed time reading geoTIFF: " << blue << (chrono_duration.count()/1000.0) << reset << " seconds...";
     logc.info ("time", s);
-
-    double acum = 0.0;
+    
+    // Next step: compute the min, max, mean
+    double acum = 0.0, acum_nz = 0.0; // _nz vars correspond to the same variables without the ZERO elements (assuming unimodal distribution)
     int nodataCount = 0;
+    int cont_nz = 0;
     double _min, _max; // we cannot retrieve them from the data matrix because we need to remove first the nodata fields
-    double delta = (histMax - histMin)/(double) nBins;
+    double _min_nz, _max_nz; // we cannot retrieve them from the data matrix because we need to remove first the nodata fields
+    double delta = (histMax - histMin)/(double) nBins; // width of each histogram bin
     vector<double> v; //let's preallocate half of the required memory to avoid triggered realloc during exec
     v.reserve(xSize*ySize/2);
-    vector<int> histogram(nBins, 0);    //histogram
+    vector<int> histogram(nBins, 0);    // histogram container
+
     // double z;    // too much overhead multithreading, not worth creating too many workers
     // #pragma omp for reduction(+:acum)
     chrono_start = high_resolution_clock::now();
@@ -153,6 +148,8 @@ int main(int argc, char *argv[])
             if (z != dfNoData){
                 v.push_back(z);  // push into the vector
                 acum += z;  // increase accumulator (to compute mean value)
+                if (z != 0) cont_nz++;
+                // if z = 0, it won't affect the value of the acum
                 // let's compute the corresponding bin
                 int bin;
                 if      (z <= histMin) bin = 0;       // cap min
@@ -164,7 +161,7 @@ int main(int argc, char *argv[])
                 histogram[bin] = histogram[bin] + 1;
             }
             else{
-                nodataCount++;// increase counter of nodata pixels. It must match TotalPixel - v.size()
+                nodataCount++;// increase counter of nodata pixels. It must match TotalPixel - N
             }
         }
     }
@@ -174,56 +171,99 @@ int main(int argc, char *argv[])
     s << "Ellapsed time processing data: " << blue << chrono_duration.count() << reset << " milliseconds...";
     logc.info ("time", s);
 
-    double mean = acum/v.size();
-    double variance =0;
+    int N =  v.size();
+    double mean    = acum/N;
+    double mean_nz = acum/cont_nz;
+    double variance = 0, variance_nz = 0;
+    double k_acum = 0,   k_acum_nz = 0;
     acum = 0;
     // Now, having the mean, we can compute the stdev (first the variance)
-
+    // Main loop: ****************************************************************
     _min = _max = v[0]; // we use the first value as seed for min/max extraction
     for (auto z:v){
-        double dist = z - mean;
-        acum += dist*dist; // acum to the variance
+        register double dist = z - mean; // distance to the mean
+        register double d2 = dist*dist;
+        acum += d2;      // acum to the variance
+        k_acum += d2*d2; // acum for the distribution kurtosis 
+
+        register double dist_nz = z - mean_nz; // distance to the mean
+        register double d2_nz = dist_nz*dist_nz;
+        acum_nz += d2;      // acum to the variance
+        k_acum_nz += d2_nz*d2_nz; // acum for the distribution kurtosis 
+
         if (z < _min)       _min = z; //let's update the min
         else if (z > _max)  _max = z; //let's update the max
     }
-    variance = acum / v.size(); // no Bessel correction because we are using the entire population
+    variance = acum / N; // no Bessel correction because we are using the entire population. Otherwise we should use v.size()-1
     double stdev = sqrt(variance); 
+    // kurtosis = (1/N)sum{(x-mean)^4} / (1/N)*sum{(x-mean)^2}^2..................... (x-mean)^2 = variance
+    // kurtosis = (1/N) * (k_acum) / variance^2
+    double kurtosis = k_acum / (variance * variance * N);
+    // partial sort is o(N) linear complexity, guarantees the position of the midpoint element of the array
+    std::nth_element(v.begin(), v.begin() + N/2, v.end());
+    double median = v[N/2]; // the element in the middle of the partially sorted vector
+    // Non-parametric skew S = (mean - median)/stdev
+    // skewness is defined using the Peasron 2nd skew coefficient: p2c = 3*S
+    double skew = 3*(mean - median)/stdev;
+    double area = N*xResolution*yResolution;
 
-    // partial sort is o(N) linear complexity, guarantees the midpoitn element of the array
+    variance_nz = acum_nz / cont_nz; // no Bessel correction because we are using the entire population. Otherwise we should use N-1
+    double stdev_nz = sqrt(variance_nz); 
+    // kurtosis = (1/N)sum{(x-mean)^4} / (1/N)*sum{(x-mean)^2}^2..................... (x-mean)^2 = variance
+    // kurtosis = (1/N) * (k_acum) / variance^2
+    double kurtosis_nz = k_acum_nz / (variance_nz * variance_nz * cont_nz);
+
+    // remove ZERO from the vector before sorting it
+    // auto v_nz = v;
+    v.erase(std::remove(v.begin(), v.end(), 0.0), v.end());
+    // partial sort is o(N) linear complexity, guarantees the position of the midpoint element of the array
     std::nth_element(v.begin(), v.begin() + v.size()/2, v.end());
-    double median = v[v.size()/2];
-    double area = v.size()*xResolution*yResolution;
+    double median_nz = v[v.size()/2]; // the element in the middle of the partially sorted vector
+    // Non-parametric skew S = (mean - median)/stdev
+    // skewness is defined using the Peasron 2nd skew coefficient: p2c = 3*S
+    double skew_nz = 3*(mean_nz - median_nz)/stdev_nz;
+    double area_nz = v.size()*xResolution*yResolution;
 
-    // TODO: improve screen output
     // PRINT SUMMARY ON SCREEN
     cout << "Total of no_data:\t" << nodataCount << endl;
     // cout << "Total of data:\t" << dataCount << endl;
-    cout << "Vector size:\t" << v.size() << endl;
+    cout << "Vector size:\t" << N << endl;
     cout << "Actual area:\t" << area << endl;
-    cout << "Mean value:\t" << mean << endl;
-    cout << "Variance value:\t" << variance << endl;
-    cout << "Stdev:\t" << stdev << endl;
-    cout << reset << "Median value:\t" << median << endl;
+    cout << "Mean value:\t" << mean << "\t\twithout ZERO" << "\t" << mean_nz << endl;
+    cout << "Variance value:\t" << variance << "\twithout ZERO" << "\t" << variance_nz << endl;
+    cout << "Stdev:    \t" << stdev << "\twithout ZERO" << "\t" << stdev_nz << endl;
+    cout << "Kurtosis: \t" << kurtosis  << "\t\twithout ZERO" << "\t" << kurtosis_nz << endl;
+    cout << "Skew:     \t" << skew  << "\t\twithout ZERO" << "\t" << skew_nz <<  endl;
+    cout << reset << "Median value:\t" << median  << "\t\twithout ZERO" << "\t" << median_nz <<  endl;
     cout << "Min value:\t" << _min << endl;
     cout << "Max value:\t" << _max << endl;
 
-    cout << "Histogram: " << endl;
+    cout << "Histogram: [";
     for (auto x:histogram)
         cout << x << " ";
+    cout << "]" << endl;
 
     // DUMP TO OUTPUT FILE
     std::ofstream outFile(outputFileName);
-    
-    if (!argNoHeader){
+    if (!argNoHeader){ // generate header
         outFile << "Filename\tNODATA\tXresolution\tYresolution\tPixel\tArea_m2\tMin\tMax\tMean\tMedian\tStdev\tHist_min\tHist_max\tBins";
         for (int i=0; i < nBins; i++)
             outFile << "\tbin_" << i;
         outFile << endl;
     }
-    outFile << outputFileName << "\t" << dfNoData << "\t" << xResolution << "\t" << yResolution << "\t" << v.size() << "\t" << area;
+    outFile << outputFileName << "\t" << dfNoData << "\t" << xResolution << "\t" << yResolution << "\t" << N << "\t" << area;
     outFile << "\t" << _min << "\t" << _max << "\t" << mean << "\t" << median << "\t" << stdev << "\t" << histMin << "\t" << histMax << "\t" << nBins;
     for (int i=0; i < nBins; i++)
         outFile << "\t" << histogram[i];
+    outFile << endl;
+
+    // Now we repeat the row-entry for Non-Zero stats
+    outFile << "ZEROES_REMOVED" << "\t" << dfNoData << "\t" << xResolution << "\t" << yResolution << "\t" << v.size() << "\t" << area_nz;
+    outFile << "\t" << _min << "\t" << _max << "\t" << mean_nz << "\t" << median_nz << "\t" << stdev_nz << "\t" << histMin << "\t" << histMax << "\t" << nBins;
+    for (int i=0; i < nBins; i++){
+        if (i==0) histogram[i] = 0;     // we erase all ZERO entries in the histogram before exporting it
+        outFile << "\t" << histogram[i];
+    }
     outFile << endl;
 
     //------------>END
