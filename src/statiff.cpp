@@ -93,8 +93,8 @@ int main(int argc, char *argv[])
     // inputGeotiff.ShowInformation(); // show detailed info if asked for
 
     // canvas dimension
-    int xSize = poDataset->GetRasterXSize();
-    int ySize = poDataset->GetRasterYSize();
+    double xSize = poDataset->GetRasterXSize();
+    double ySize = poDataset->GetRasterYSize();
     // pixel resolution
     double xResolution, yResolution;
 	double adfGeoTransform[6]; // 6-DOF geoTIFF params: center, resolution, rotation...
@@ -113,7 +113,8 @@ int main(int argc, char *argv[])
     logc.debug("geotiff", "geoTIFF summary information: *****************************************");
     cout << "\tCanvas size:     \t[" << xSize << " x " << ySize << "] = [" << yellow << xSize * ySize << reset << "] pixels" << endl;
     cout << "\tPixel resolution:\t[" << yellow << xResolution << " x " << yResolution << reset << "] meter / pixel" << endl;
-    cout << "\t\t> Nominal area:\t[" << cyan << xSize*ySize*xResolution*yResolution << reset << "] m2" << endl;
+    double nom_area = xSize*ySize*xResolution*yResolution;
+    cout << "\t\t> Nominal area:\t[" << cyan << nom_area << reset << "] m2\t[" << yellow << nom_area/10000 << reset << "] ha" << endl;
     cout << "\tNo data:         \t[" << (bGotNodata ? green : red) << dfNoData << reset << "]" << endl;
 
     logc.debug ("geotiff", "Loading geoTIFF data into memory. This may take a while ...");
