@@ -91,10 +91,13 @@ int main(int argc, char *argv[])
     GDALDataset *poDataset;
     poDataset = inputGeotiff.GetDataset(); //pull the pointer to the main GDAL dataset structure
     // inputGeotiff.ShowInformation(); // show detailed info if asked for
+    int *dimensions;
+    dimensions = inputGeotiff.GetDimensions();
 
     // canvas dimension
-    double xSize = poDataset->GetRasterXSize();
-    double ySize = poDataset->GetRasterYSize();
+    long int xSize = dimensions[0]; //NCols
+    long int ySize = dimensions[1]; //nRows
+    // long int ySize = poDataset->GetRasterYSize();
     // pixel resolution
     double xResolution, yResolution;
 	double adfGeoTransform[6]; // 6-DOF geoTIFF params: center, resolution, rotation...
