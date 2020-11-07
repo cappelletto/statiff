@@ -168,8 +168,9 @@ int main(int argc, char *argv[])
 
     chrono_stop = high_resolution_clock::now();
     chrono_duration = duration_cast< milliseconds>(chrono_stop - chrono_start); 
-    s << "Ellapsed time processing data: " << blue << chrono_duration.count() << reset << " milliseconds...";
+    s << "Ellapsed time pre-processing data: " << blue << chrono_duration.count() << reset << " milliseconds...";
     logc.info ("time", s);
+    logc.info ("time", "Now computing stats ...");
 
     int N =  v.size();
     double mean    = acum/N;
@@ -215,7 +216,7 @@ int main(int argc, char *argv[])
 
     // remove ZERO from the vector before sorting it
     // auto v_nz = v;
-    v.erase(std::remove(v.begin(), v.end(), 0.0), v.end());
+    v.erase(std::remove(v.begin(), v.end(), 0), v.end());
     // partial sort is o(N) linear complexity, guarantees the position of the midpoint element of the array
     std::nth_element(v.begin(), v.begin() + v.size()/2, v.end());
     double median_nz = v[v.size()/2]; // the element in the middle of the partially sorted vector
@@ -223,11 +224,13 @@ int main(int argc, char *argv[])
     // skewness is defined using the Peasron 2nd skew coefficient: p2c = 3*S
     double skew_nz = 3*(mean_nz - median_nz)/stdev_nz;
     double area_nz = v.size()*xResolution*yResolution;
+    double proportion = (double) N/(xSize*ySize);
 
     // PRINT SUMMARY ON SCREEN
     cout << "Total of no_data:\t" << nodataCount << endl;
     // cout << "Total of data:\t" << dataCount << endl;
     cout << "Vector size:\t" << N << endl;
+    cout << "Proportion: \t" << proportion << endl;
     cout << "Actual area:\t" << area << endl;
     cout << "Mean value:\t" << mean << "\t\twithout ZERO" << "\t" << mean_nz << endl;
     cout << "Variance value:\t" << variance << "\twithout ZERO" << "\t" << variance_nz << endl;
@@ -247,19 +250,19 @@ int main(int argc, char *argv[])
     // ****************************************************************************************
     std::ofstream outFile("STAT_" + outputFileName);
     if (!argNoHeader){ // generate header
-        outFile << "Filename\tNODATA\tXresolution\tYresolution\tN_Pixels\tArea_m2\tMin\tMax\tMean\tMedian\tStdev\tKurtosis\tSkew\tHist_min\tHist_max\tBins";
+        outFile << "Filename\tNODATA\tXresolution\tYresolution\tN_Pixels\tData_Proportion\tArea_m2\tMin\tMax\tMean\tMedian\tStdev\tKurtosis\tSkew\tHist_min\tHist_max\tBins";
         // for (int i=0; i < nBins; i++)
         //     outFile << "\tbin_" << i;
         outFile << endl;
     }
-    outFile << outputFileName << "\t" << dfNoData << "\t" << xResolution << "\t" << yResolution << "\t" << N << "\t" << area;
+    outFile << outputFileName << "\t" << dfNoData << "\t" << xResolution << "\t" << yResolution << "\t" << N << "\t" <<  proportion<< "\t" << area;
     outFile << "\t" << _min << "\t" << _max << "\t" << mean << "\t" << median << "\t" << stdev << "\t" << kurtosis << "\t" << skew << "\t" << histMin << "\t" << histMax << "\t" << nBins;
     // for (int i=0; i < nBins; i++)
     //     outFile << "\t" << histogram[i];
     outFile << endl;
 
     // Now we repeat the row-entry for Non-Zero stats
-    outFile << "ZEROES_REMOVED" << "\t" << dfNoData << "\t" << xResolution << "\t" << yResolution << "\t" << v.size() << "\t" << area_nz;
+    outFile << "ZEROES_REMOVED" << "\t" << dfNoData << "\t" << xResolution << "\t" << yResolution << "\t" << v.size() << "\t" << proportion << "\t" << area_nz;
     outFile << "\t" << _min << "\t" << _max << "\t" << mean_nz << "\t" << median_nz << "\t" << stdev_nz << "\t" << kurtosis_nz << "\t" << skew_nz << "\t" << histMin << "\t" << histMax << "\t" << nBins;
     // for (int i=0; i < nBins; i++){
     //     if (i==0) histogram[i] = 0;     // we erase all ZERO entries in the histogram before exporting it
@@ -270,6 +273,7 @@ int main(int argc, char *argv[])
     // ****************************************************************************************
     // -- The actual histograms is dumped onto a separate file (filename_suffix, suffix: _HIST)
     std::ofstream outFileHist("HIST_" + outputFileName);
+    std::ofstream outFileBins("BINS_" + outputFileName); // file that contains the raw bin count in a column-wise fashion. Easier to merge using bash
     // first c
     if (!argNoHeader){ // generate header for histogram data with some context (linked stat file, number of bins, histogram range)
         outFileHist << "#Stat_file:\t" << outputFileName << endl;
@@ -277,12 +281,19 @@ int main(int argc, char *argv[])
         outFileHist << "#histMin:\t"   << histMin << endl;
         outFileHist << "#histMax:\t"   << histMax << endl; 
     }
-
+    // add X column with the center of each bin
+    outFileHist << "xbin\thist\thist_nozero\thist_norm\thist_nozero_norm" << endl;
     for (int i=0; i < nBins; i++){
+        register double xbin = histMin + delta/2 + delta*i; // centered by delta/2 
+        outFileHist << xbin << "\t";            // central position of each bin. calculate to start from histMin + delta/2
         outFileHist << histogram[i] << "\t";            // original histogram
         outFileHist << (i ? histogram[i] : 0) << "\t";            // original histogram
         outFileHist << double(histogram[i]/(double)N) << "\t";            // original histogram
         outFileHist << (i ? double(histogram[i]/(double)v.size()) : 0.0) << endl;            // original histogram
+
+        outFileBins << histogram[i];
+        if (i<(nBins-1)) outFileBins << "\t";
+            else         outFileBins << endl;
     }
     //------------>END
     return ErrorCode::NO_ERROR; // everything went smooth
