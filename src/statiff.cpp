@@ -3,7 +3,7 @@
  * @author  Jose Cappelletto (cappelletto@gmail.com)
  * @brief   geoTIFF statistics calculator tool. Use to analyze raster geoTIFF generated during the calculation of Landability and Measurability scores
  *          gdalinfo does not provide control over the histogram and the statistics calculation
- * @version 0.1
+ * @version 0.2
  * @date    2020-10-30
  * 
  * @copyright Copyright (c) 2020
@@ -32,8 +32,12 @@ int main(int argc, char *argv[])
     if (retval != 0)  // some error ocurred, we have been signaled to stop
         return retval;
     std::ostringstream s;
-    string  inputFileName    = ""; // command arg or config defined
-    string outputFileName    = ""; // command arg or config defined
+    string  inputFileName    = ""; // command arg defined
+    string outputFileName    = ""; // command arg defined
+    bool outputConsoleOnly = false;
+
+    int verbosity = 0;
+    if (argVerbose) verbosity = args::get(argVerbose);
 
     if (argInput) inputFileName = args::get(argInput); //input file is mandatory argument.
     if (inputFileName.empty()){ //not defined as command line argument? let's use config.yaml definition
@@ -43,20 +47,22 @@ int main(int argc, char *argv[])
     }
 
     if (argInput) outputFileName = args::get(argOutput); //input file is mandatory argument.
+    // TODO: IF NO OUTPUT FILE IS PROVIDED, WE CAN ASSUME THAT WE ARE ASKING FOR CONSOLE OUTPUT ONLY (BATCH PROCESS)
     if (outputFileName.empty()){ //not defined as command line argument? let's use config.yaml definition
         // ERROR! We do not have any definition of the input file
-        logc.error ("main", "Input file missing. Please define it using --output='filename'");
-        return ErrorCode::INVALID_ARG;
+        if (verbosity >= 1){
+            logc.error ("main", "Input file missing. Please define it using --output='filename'");
+        }
+        outputConsoleOnly = true; // no outputfile provided, exporting results to console
+        // return ErrorCode::INVALID_ARG;
     }
 
-    int nThreads = DEFAULT_NTHREADS;
     double histMin = 0.0, histMax = 1.0;
     int nBins = 100;
-
-    if (argNThreads) nThreads = args::get(argNThreads);
     if (argHistMax)   histMax = args::get(argHistMax);
     if (argHistMin)   histMin = args::get(argHistMin);
     if (argHistBin)     nBins = args::get(argHistBin);
+
     // validating input:
     if (histMin >= histMax){
         s << "Wrong histogram range arguments. histMin [" << yellow << histMin << reset << "] must be lower than histMax [" << yellow << histMax << reset << "]";
@@ -71,12 +77,13 @@ int main(int argc, char *argv[])
     }
 
     // PRINT SUMMARY
-    logc.debug("main", "Summary information *****************************************************");
-    cout << "\tInput file:   \t" << green << inputFileName << reset << endl;
-    cout << "\tOutput file:  \t" << green << outputFileName << reset << endl;
-    cout << "\tExport header:\t" << yellow << (argNoHeader ? "true" :  "false") << reset << endl;
-    cout << "\tHistogram:    \t" << green << "[" << histMin << " : " << histMax << "]" << reset << "\t #Bins: " << yellow << nBins << reset << endl;
-    cout << "\tNumber of threads (OpenMP):  \t" << yellow << nThreads << reset << endl;
+    if (verbosity >= 1){
+        logc.debug("main", "Summary information *****************************************************");
+        cout << "\tInput file:   \t" << green << inputFileName << reset << endl;
+        cout << "\tOutput file:  \t" << green << outputFileName << reset << endl;
+        cout << "\tExport header:\t" << yellow << (argNoHeader ? "true" :  "false") << reset << endl;
+        cout << "\tHistogram:    \t" << green << "[" << histMin << " : " << histMax << "]" << reset << "\t #Bins: " << yellow << nBins << reset << endl;
+    }
 
     //LOAD GEOTIFF HEADER
     Geotiff inputGeotiff (inputFileName.c_str());
@@ -109,18 +116,19 @@ int main(int argc, char *argv[])
     // raster NO_DATA value
     int bGotNodata = 0;
     double dfNoData = GDALGetRasterNoDataValue (GDALGetRasterBand( poDataset, 1 ), &bGotNodata);
-    if (!bGotNodata){
+    if (!bGotNodata && (verbosity >=2 )){
         logc.warn ("main", "NODATA field not available in the raster input. Using as default value [-9999]");
         dfNoData = -9999.0;
     }
-    logc.debug("geotiff", "geoTIFF summary information: *****************************************");
-    cout << "\tCanvas size:     \t[" << xSize << " x " << ySize << "] = [" << yellow << xSize * ySize << reset << "] pixels" << endl;
-    cout << "\tPixel resolution:\t[" << yellow << xResolution << " x " << yResolution << reset << "] meter / pixel" << endl;
     double nom_area = xSize*ySize*xResolution*yResolution;
-    cout << "\t\t> Nominal area:\t[" << cyan << nom_area << reset << "] m2\t[" << yellow << nom_area/10000 << reset << "] ha" << endl;
-    cout << "\tNo data:         \t[" << (bGotNodata ? green : red) << dfNoData << reset << "]" << endl;
-
-    logc.debug ("geotiff", "Loading geoTIFF data into memory. This may take a while ...");
+    if (verbosity >= 1){
+        logc.debug("geotiff", "geoTIFF summary information: *****************************************");
+        cout << "\tCanvas size:     \t[" << xSize << " x " << ySize << "] = [" << yellow << xSize * ySize << reset << "] pixels" << endl;
+        cout << "\tPixel resolution:\t[" << yellow << xResolution << " x " << yResolution << reset << "] meter / pixel" << endl;
+        cout << "\t\t> Nominal area:\t[" << cyan << nom_area << reset << "] m2\t[" << yellow << nom_area/10000 << reset << "] ha" << endl;
+        cout << "\tNo data:         \t[" << (bGotNodata ? green : red) << dfNoData << reset << "]" << endl;
+        logc.debug ("geotiff", "Loading geoTIFF data into memory. This may take a while ...");
+    }
     //let's benchmark reading time
     auto chrono_start = high_resolution_clock::now(); 
     // load data into memory
@@ -128,9 +136,10 @@ int main(int argc, char *argv[])
     apData = inputGeotiff.GetRasterBand(1);
     auto chrono_stop     = high_resolution_clock::now(); 
     auto chrono_duration = duration_cast<milliseconds>(chrono_stop - chrono_start); 
+    if (verbosity >= 1){
         s << "Ellapsed time reading geoTIFF: " << blue << (chrono_duration.count()/1000.0) << reset << " seconds...";
-    logc.info ("time", s);
-    
+        logc.info ("time", s);
+    }    
     // Next step: compute the min, max, mean
     double acum = 0.0, acum_nz = 0.0; // _nz vars correspond to the same variables without the ZERO elements (assuming unimodal distribution)
     int nodataCount = 0;
@@ -172,9 +181,11 @@ int main(int argc, char *argv[])
 
     chrono_stop = high_resolution_clock::now();
     chrono_duration = duration_cast< milliseconds>(chrono_stop - chrono_start); 
-    s << "Ellapsed time pre-processing data: " << blue << chrono_duration.count() << reset << " milliseconds...";
-    logc.info ("time", s);
-    logc.info ("time", "Now computing stats ...");
+    if (verbosity >= 1){
+        s << "Ellapsed time pre-processing data: " << blue << chrono_duration.count() << reset << " milliseconds...";
+        logc.info ("time", s);
+        logc.info ("time", "Now computing stats ...");
+    }
 
     int N =  v.size();
     double mean    = acum/N;
@@ -231,24 +242,26 @@ int main(int argc, char *argv[])
     double proportion = (double) N/(xSize*ySize);
 
     // PRINT SUMMARY ON SCREEN
-    cout << "Total of no_data:\t" << nodataCount << endl;
-    // cout << "Total of data:\t" << dataCount << endl;
-    cout << "Vector size:\t" << N << endl;
-    cout << "Proportion: \t" << proportion << endl;
-    cout << "Actual area:\t" << area << endl;
-    cout << "Mean value:\t" << mean << "\t\twithout ZERO" << "\t" << mean_nz << endl;
-    cout << "Variance value:\t" << variance << "\twithout ZERO" << "\t" << variance_nz << endl;
-    cout << "Stdev:    \t" << stdev << "\twithout ZERO" << "\t" << stdev_nz << endl;
-    cout << "Kurtosis: \t" << kurtosis  << "\t\twithout ZERO" << "\t" << kurtosis_nz << endl;
-    cout << "Skew:     \t" << skew  << "\t\twithout ZERO" << "\t" << skew_nz <<  endl;
-    cout << reset << "Median value:\t" << median  << "\t\twithout ZERO" << "\t" << median_nz <<  endl;
-    cout << "Min value:\t" << _min << endl;
-    cout << "Max value:\t" << _max << endl;
+    if (verbosity >= 1){
+        cout << "Total of no_data:\t" << nodataCount << endl;
+        // cout << "Total of data:\t" << dataCount << endl;
+        cout << "Vector size:\t" << N << endl;
+        cout << "Proportion: \t" << proportion << endl;
+        cout << "Actual area:\t" << area << endl;
+        cout << "Mean value:\t" << mean << "\t\twithout ZERO" << "\t" << mean_nz << endl;
+        cout << "Variance value:\t" << variance << "\twithout ZERO" << "\t" << variance_nz << endl;
+        cout << "Stdev:    \t" << stdev << "\twithout ZERO" << "\t" << stdev_nz << endl;
+        cout << "Kurtosis: \t" << kurtosis  << "\t\twithout ZERO" << "\t" << kurtosis_nz << endl;
+        cout << "Skew:     \t" << skew  << "\t\twithout ZERO" << "\t" << skew_nz <<  endl;
+        cout << reset << "Median value:\t" << median  << "\t\twithout ZERO" << "\t" << median_nz <<  endl;
+        cout << "Min value:\t" << _min << endl;
+        cout << "Max value:\t" << _max << endl;
 
-    cout << "Histogram: [";
-    for (auto x:histogram)
-        cout << x << " ";
-    cout << "]" << endl;
+        cout << "Histogram: [";
+        for (auto x:histogram)
+            cout << x << " ";
+        cout << "]" << endl;
+    }
 
     // DUMP TO OUTPUT FILE
     // ****************************************************************************************
