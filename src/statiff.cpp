@@ -46,12 +46,12 @@ int main(int argc, char *argv[])
         return ErrorCode::INVALID_ARG;
     }
 
-    if (argInput) outputFileName = args::get(argOutput); //input file is mandatory argument.
+    if (argOutput) outputFileName = args::get(argOutput); //input file is mandatory argument.
     // TODO: IF NO OUTPUT FILE IS PROVIDED, WE CAN ASSUME THAT WE ARE ASKING FOR CONSOLE OUTPUT ONLY (BATCH PROCESS)
     if (outputFileName.empty()){ //not defined as command line argument? let's use config.yaml definition
         // ERROR! We do not have any definition of the input file
         if (verbosity >= 1){
-            logc.error ("main", "Input file missing. Please define it using --output='filename'");
+            logc.info ("main", "Output file missing, console output only. If you need to export the results please define an output file using [--output]");
         }
         outputConsoleOnly = true; // no outputfile provided, exporting results to console
         // return ErrorCode::INVALID_ARG;
@@ -261,6 +261,13 @@ int main(int argc, char *argv[])
         for (auto x:histogram)
             cout << x << " ";
         cout << "]" << endl;
+    }
+
+    if (outputConsoleOnly){
+        if (verbosity >= 1){
+            logc.warn("main", "No summary files were exported. Use [--output] if required");
+        }
+        return NO_ERROR;
     }
 
     // DUMP TO OUTPUT FILE
