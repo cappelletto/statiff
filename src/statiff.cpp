@@ -158,7 +158,7 @@ int main(int argc, char *argv[])
         for (int col = 0; col < xSize; col++){
             double z = apData[row][col];
             // z = apData[row][col];
-            if (z != dfNoData){
+            if (z != dfNoData && !isnan(z)){
                 v.push_back(z);  // push into the vector
                 acum += z;  // increase accumulator (to compute mean value)
                 if (z != 0) cont_nz++;
