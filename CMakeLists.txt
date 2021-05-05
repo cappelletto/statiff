@@ -1,5 +1,11 @@
 cmake_minimum_required(VERSION 3.2)
 
+if(NOT DEFINED CMAKE_BUILD_TYPE)
+   set(CMAKE_BUILD_TYPE Release CACHE STRING
+      "Choose the type of build, options are: None Debug Release RelWithDebug RelWithDebInfo MinSizeRel."
+      FORCE)
+endif()
+
 set(CMAKE_COLOR_MAKEFILE ON)  # For fancy colouring scheme
 if (${FORCE_COLORED_OUTPUT})
     if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
@@ -11,7 +17,9 @@ endif ()
 
 # Define project name
 project(statiff_project)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -pthread")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -pthread -mavx2")
+# Additional flags for vectorized/multithread profiling and debugging
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp -O3 -pg  -shared-libgcc -g ")
 
 find_package(OpenMP)
 if(OPENMP_FOUND)
