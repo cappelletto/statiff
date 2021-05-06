@@ -59,22 +59,27 @@ int main(int argc, char *argv[])
 
     double histMin = 0.0, histMax = 1.0;
     int nBins = 100;
-    if (argHistMax)   histMax = args::get(argHistMax);
-    if (argHistMin)   histMin = args::get(argHistMin);
-    if (argHistBin)     nBins = args::get(argHistBin);
+    if (!argNoHistogram)
+    {
+        if (argHistMax)   histMax = args::get(argHistMax);
+        if (argHistMin)   histMin = args::get(argHistMin);
+        if (argHistBin)     nBins = args::get(argHistBin);
+        // if argNoHistogram is called, these paremeters will be ignored
 
-    // validating input:
-    if (histMin >= histMax){
-        s << "Wrong histogram range arguments. histMin [" << yellow << histMin << reset << "] must be lower than histMax [" << yellow << histMax << reset << "]";
-        logc.error("main", s);
-        return statiff::INVALID_ARG;
+        // validating input:
+        if (histMin >= histMax){
+            s << "Wrong histogram range arguments. histMin [" << yellow << histMin << reset << "] must be lower than histMax [" << yellow << histMax << reset << "]";
+            logc.error("main", s);
+            return statiff::INVALID_ARG;
+        }
+        
+        if (nBins <= 0){
+            s << "Number of bins nBins[" << yellow << nBins << reset << "] must be positive integer";
+            logc.error("main", s);
+            return statiff::INVALID_ARG;
+        }
     }
-    
-    if (nBins <= 0){
-        s << "Number of bins nBins[" << yellow << nBins << reset << "] must be positive integer";
-        logc.error("main", s);
-        return statiff::INVALID_ARG;
-    }
+
 
     // PRINT SUMMARY
     if (verbosity >= 1){
@@ -82,7 +87,10 @@ int main(int argc, char *argv[])
         cout << "\tInput file:   \t" << green << inputFileName << reset << endl;
         cout << "\tOutput file:  \t" << green << outputFileName << reset << endl;
         cout << "\tExport header:\t" << yellow << (argNoHeader ? "true" :  "false") << reset << endl;
-        cout << "\tHistogram:    \t" << green << "[" << histMin << " : " << histMax << "]" << reset << "\t #Bins: " << yellow << nBins << reset << endl;
+        if (argNoHistogram)
+            cout << yellow << "No histogram will be computed (--nohist option passed)" << reset << endl;
+        else
+            cout << "\tHistogram:    \t" << green << "[" << histMin << " : " << histMax << "]" << reset << "\t #Bins: " << yellow << nBins << reset << endl;
     }
 
     //LOAD GEOTIFF HEADER
@@ -164,21 +172,22 @@ int main(int argc, char *argv[])
                 if (z != 0) cont_nz++;
                 // if z = 0, it won't affect the value of the acum
                 // let's compute the corresponding bin
-                int bin;
-                if      (z <= histMin) bin = 0;       // cap min
-                else if (z >= histMax) bin = nBins-1; // cap max
-                else{
-                    bin = floor((z - histMin)/delta);
+                if (!argNoHistogram){
+                    int bin;
+                    if      (z <= histMin) bin = 0;       // cap min
+                    else if (z >= histMax) bin = nBins-1; // cap max
+                    else{
+                        bin = floor((z - histMin)/delta);
+                    }
+                    // cout << bin << " ";
+                    histogram[bin] = histogram[bin] + 1;
                 }
-                // cout << bin << " ";
-                histogram[bin] = histogram[bin] + 1;
             }
             else{
                 nodataCount++;// increase counter of nodata pixels. It must match TotalPixel - N
             }
         }
     }
-
     chrono_stop = high_resolution_clock::now();
     chrono_duration = duration_cast< milliseconds>(chrono_stop - chrono_start); 
     if (verbosity >= 1){
@@ -187,6 +196,8 @@ int main(int argc, char *argv[])
         logc.info ("time", "Now computing stats ...");
     }
 
+
+    chrono_start = high_resolution_clock::now();
     int N =  v.size();
     double mean    = acum/N;
     double mean_nz = acum/cont_nz;
@@ -241,6 +252,13 @@ int main(int argc, char *argv[])
     double area_nz = v.size()*xResolution*yResolution;
     double proportion = (double) N/(xSize*ySize);
 
+    chrono_stop = high_resolution_clock::now();
+    chrono_duration = duration_cast< milliseconds>(chrono_stop - chrono_start); 
+    if (verbosity >= 1){
+        s << "Ellapsed time computing stats: " << blue << chrono_duration.count() << reset << " milliseconds...";
+        logc.info ("time", s);
+    }
+
     // PRINT SUMMARY ON SCREEN
     if (verbosity >= 1){
         cout << "Total of no_data:\t" << nodataCount << endl;
@@ -257,10 +275,12 @@ int main(int argc, char *argv[])
         cout << "Min value:\t" << _min << endl;
         cout << "Max value:\t" << _max << endl;
 
-        cout << "Histogram: [";
-        for (auto x:histogram)
-            cout << x << " ";
-        cout << "]" << endl;
+        if (!argNoHistogram){
+            cout << "Histogram: [";
+            for (auto x:histogram)
+                cout << x << " ";
+            cout << "]" << endl;
+        }
     }
 
     if (outputConsoleOnly){
@@ -296,28 +316,30 @@ int main(int argc, char *argv[])
 
     // ****************************************************************************************
     // -- The actual histograms is dumped onto a separate file (filename_suffix, suffix: _HIST)
+    if (!argNoHistogram){
     std::ofstream outFileHist("HIST_" + outputFileName);
-    std::ofstream outFileBins("BINS_" + outputFileName); // file that contains the raw bin count in a column-wise fashion. Easier to merge using bash
-    // first c
-    if (!argNoHeader){ // generate header for histogram data with some context (linked stat file, number of bins, histogram range)
-        outFileHist << "#Stat_file:\t" << outputFileName << endl;
-        outFileHist << "#nBins:\t"     << nBins   << endl;
-        outFileHist << "#histMin:\t"   << histMin << endl;
-        outFileHist << "#histMax:\t"   << histMax << endl; 
-    }
-    // add X column with the center of each bin
-    outFileHist << "xbin\thist\thist_nozero\thist_norm\thist_nozero_norm" << endl;
-    for (int i=0; i < nBins; i++){
-        register double xbin = histMin + delta/2 + delta*i; // centered by delta/2 
-        outFileHist << xbin << "\t";            // central position of each bin. calculate to start from histMin + delta/2
-        outFileHist << histogram[i] << "\t";            // original histogram
-        outFileHist << (i ? histogram[i] : 0) << "\t";            // original histogram
-        outFileHist << double(histogram[i]/(double)N) << "\t";            // original histogram
-        outFileHist << (i ? double(histogram[i]/(double)v.size()) : 0.0) << endl;            // original histogram
+        std::ofstream outFileBins("BINS_" + outputFileName); // file that contains the raw bin count in a column-wise fashion. Easier to merge using bash
+        // first c
+        if (!argNoHeader){ // generate header for histogram data with some context (linked stat file, number of bins, histogram range)
+            outFileHist << "#Stat_file:\t" << outputFileName << endl;
+            outFileHist << "#nBins:\t"     << nBins   << endl;
+            outFileHist << "#histMin:\t"   << histMin << endl;
+            outFileHist << "#histMax:\t"   << histMax << endl; 
+        }
+        // add X column with the center of each bin
+        outFileHist << "xbin\thist\thist_nozero\thist_norm\thist_nozero_norm" << endl;
+        for (int i=0; i < nBins; i++){
+            register double xbin = histMin + delta/2 + delta*i; // centered by delta/2 
+            outFileHist << xbin << "\t";            // central position of each bin. calculate to start from histMin + delta/2
+            outFileHist << histogram[i] << "\t";            // original histogram
+            outFileHist << (i ? histogram[i] : 0) << "\t";            // original histogram
+            outFileHist << double(histogram[i]/(double)N) << "\t";            // original histogram
+            outFileHist << (i ? double(histogram[i]/(double)v.size()) : 0.0) << endl;            // original histogram
 
-        outFileBins << histogram[i];
-        if (i<(nBins-1)) outFileBins << "\t";
-            else         outFileBins << endl;
+            outFileBins << histogram[i];
+            if (i<(nBins-1)) outFileBins << "\t";
+                else         outFileBins << endl;
+        }
     }
     //------------>END
     return ErrorCode::NO_ERROR; // everything went smooth

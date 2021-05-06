@@ -30,6 +30,7 @@ args::ValueFlag	<int> 	argNThreads(argParser,  "nthreads", "Number of multithrea
 args::ValueFlag	<double> argHistMin(argParser,  "min_value", "Lower limit of the histogram range. Default = 0.0",  {"hmin"});
 args::ValueFlag	<double> argHistMax(argParser,  "max_value", "Upper limit for the histogram range. Default = 1.0",  {"hmax"});
 args::ValueFlag	<unsigned int> 	 argHistBin(argParser,  "N",   "Number of historam bins. Default = 100",  {"nbins"});
+args::Flag	 	 argNoHistogram(argParser,  "flag",   "Disable histogram calculation and only computes stats reducing calculation overhed (~20% faster)",  {"nohist"});
 
 args::ValueFlag	<int> 	argNoHeader(argParser,  "flag",    "Disable exporting header row containing information about each column. It will export just the data",  {"noheader"});
 
