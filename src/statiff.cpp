@@ -36,8 +36,53 @@ int main(int argc, char *argv[])
     string outputFileName    = ""; // command arg defined
     bool outputConsoleOnly = false;
 
+    Units roiUnits = UNIT_PIXEL;
     int verbosity = 0;
     if (argVerbose) verbosity = args::get(argVerbose);
+
+    const static std::unordered_map<std::string,int> unit_map{
+        {"px",  UNIT_PIXEL},
+        {"mm",  UNIT_MM},
+        {"cm",  UNIT_CM},
+        {"m",   UNIT_M},
+        {"pc",  UNIT_PCT},
+    };
+
+    if (argUnits){
+        // parsing user defined units
+        try{
+            switch(unit_map.at(args::get(argUnits))){
+                case UNIT_PIXEL:
+                    roiUnits = UNIT_PIXEL;
+                    if (verbosity> 0)   cout << "User defined ROI dimension units: " << yellow << "[PIXEL]" << reset << endl;
+                    break;
+                case UNIT_MM:
+                    roiUnits = UNIT_MM;
+                    if (verbosity> 0)   cout << "User defined ROI dimension units: " << yellow << "[MM]" << reset << endl;
+                    break;
+                case UNIT_CM:
+                    roiUnits = UNIT_CM;
+                    if (verbosity> 0)   cout << "User defined ROI dimension units: " << yellow << "[CM]" << reset << endl;
+                    break;
+                case UNIT_M:
+                    roiUnits = UNIT_M;
+                    if (verbosity> 0)   cout << "User defined ROI dimension units: " << yellow << "[M]" << reset << endl;
+                    break;
+                case UNIT_PCT:
+                    roiUnits = UNIT_PCT;
+                    if (verbosity> 0)   cout << "User defined ROI dimension units: " << yellow << "[PERCENT]" << reset << endl;
+                    break;
+                default:
+                    roiUnits = UNIT_PIXEL;
+                    logc.warn("unit", "User defined unit not recognized. Using default [PIXEL]");
+                    break;
+            }
+        }
+        catch (exception &ex){
+            roiUnits = UNIT_PIXEL;
+            logc.warn("unit", "User defined unit not recognized. Using default [PIXEL]");
+        }
+    }
 
     if (argInput) inputFileName = args::get(argInput); //input file is mandatory argument.
     if (inputFileName.empty()){ //not defined as command line argument? let's use config.yaml definition
