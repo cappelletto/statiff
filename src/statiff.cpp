@@ -37,6 +37,7 @@ int main(int argc, char *argv[])
     bool outputConsoleOnly = false;
 
     Units roiUnits = UNIT_PIXEL;
+    std::string unitString = "pixels";
     int verbosity = 0;
     if (argVerbose) verbosity = args::get(argVerbose);
 
@@ -54,34 +55,42 @@ int main(int argc, char *argv[])
             switch(unit_map.at(args::get(argUnits))){
                 case UNIT_PIXEL:
                     roiUnits = UNIT_PIXEL;
-                    if (verbosity> 0)   cout << "User defined ROI dimension units: " << yellow << "[PIXEL]" << reset << endl;
+                    unitString = "pixels";
                     break;
                 case UNIT_MM:
                     roiUnits = UNIT_MM;
-                    if (verbosity> 0)   cout << "User defined ROI dimension units: " << yellow << "[MM]" << reset << endl;
+                    unitString = "mm";
                     break;
                 case UNIT_CM:
                     roiUnits = UNIT_CM;
-                    if (verbosity> 0)   cout << "User defined ROI dimension units: " << yellow << "[CM]" << reset << endl;
+                    unitString = "cm";
                     break;
                 case UNIT_M:
                     roiUnits = UNIT_M;
-                    if (verbosity> 0)   cout << "User defined ROI dimension units: " << yellow << "[M]" << reset << endl;
+                    unitString = "m";
                     break;
                 case UNIT_PCT:
                     roiUnits = UNIT_PCT;
-                    if (verbosity> 0)   cout << "User defined ROI dimension units: " << yellow << "[PERCENT]" << reset << endl;
+                    unitString = "percent";
                     break;
                 default:
                     roiUnits = UNIT_PIXEL;
-                    logc.warn("unit", "User defined unit not recognized. Using default [PIXEL]");
+                    logc.warn("unit", "User defined unit not recognized. Using default [pixels]");
                     break;
             }
         }
         catch (exception &ex){
             roiUnits = UNIT_PIXEL;
-            logc.warn("unit", "User defined unit not recognized. Using default [PIXEL]");
+            logc.warn("unit", "User defined unit not recognized. Using default [pixels]");
         }
+        if (verbosity> 0){
+            s << "User defined unit: [" << yellow << unitString << reset << "]";
+            logc.info("config", s);
+        }
+    }
+    else{
+        roiUnits = UNIT_PIXEL;
+        if (verbosity> 0)   logc.info("config", "Using default dimension units [pixels]");
     }
 
     if (argInput) inputFileName = args::get(argInput); //input file is mandatory argument.
@@ -125,6 +134,17 @@ int main(int argc, char *argv[])
         }
     }
 
+    // CHECK IF ROI DEFINED
+    bool bRoiDefined = false;
+    long int roiWidth = -1, roiHeight = -1;
+    if (argRoiHeight){
+        bRoiDefined = true;
+        roiHeight = args::get(argRoiHeight);
+    }
+    if (argRoiWidth){
+        bRoiDefined = true;
+        roiWidth = args::get(argRoiWidth);
+    }
 
     // PRINT SUMMARY
     if (verbosity >= 1){
@@ -136,6 +156,9 @@ int main(int argc, char *argv[])
             cout << yellow << "No histogram will be computed (--nohist option passed)" << reset << endl;
         else
             cout << "\tHistogram:    \t" << green << "[" << histMin << " : " << histMax << "]" << reset << "\t #Bins: " << yellow << nBins << reset << endl;
+        if (bRoiDefined){
+            cout << "ROI defined: [" << yellow << roiWidth << " x " << roiHeight << reset << "] " << unitString << endl;
+        }
     }
 
     //LOAD GEOTIFF HEADER

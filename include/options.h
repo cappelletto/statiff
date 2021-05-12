@@ -38,6 +38,9 @@ args::ValueFlag	<int> 	argNoHeader(argParser,  "flag",    "Disable exporting hea
 args::ValueFlag	<int> 	argIntParam(argParser,  "param",    "User defined parameter INTEGER for testing purposes",  {"int"});
 args::ValueFlag	<float> argFloatParam(argParser,"param",    "User defined parameter FLOAT for testing purposes",    {"float"});
 
+args::ValueFlag	<long int> argRoiWidth (argParser,  "units", "ROI width in dimension units (px, mm, cm, m, %). If non specified, the complete image width will be used",  {"roiwidth"});
+args::ValueFlag	<long int> argRoiHeight(argParser,  "units", "ROI height in dimension units (px, mm, cm, m, %). If non specified, the complete image height will be used",  {"roiheight"});
+
 
 int initParser(int argc, char *argv[]){
         //*********************************************************************************
