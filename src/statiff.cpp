@@ -136,7 +136,7 @@ int main(int argc, char *argv[])
 
     // CHECK IF ROI DEFINED
     bool bRoiDefined = false;
-    long int roiWidth = -1, roiHeight = -1;
+    double roiWidth = -1.0, roiHeight = -1.0;
     if (argRoiHeight){
         bRoiDefined = true;
         roiHeight = args::get(argRoiHeight);
@@ -196,6 +196,44 @@ int main(int argc, char *argv[])
         logc.warn ("main", "NODATA field not available in the raster input. Using as default value [-9999]");
         dfNoData = -9999.0;
     }
+
+    int min_row = 0, max_row = ySize;
+    int min_col = 0, max_col = xSize;
+    if (bRoiDefined){
+        double s = 1.0f; // scaling factor from [units] to [pixels]
+
+        // image space is in pixels (apData matrix). We check if units are not in pixels as we could need to transform
+        if (roiUnits == UNIT_PIXEL){// no scaling required
+            min_row = (long int) (ySize - roiHeight)/2.0;
+            max_row = (long int) ySize - min_row;   // forcing symmetry
+
+            min_col = (long int) (xSize - roiWidth)/2.0;
+            max_col = (long int) xSize - min_col;   // forcing symmetry
+        }
+        else{
+            if (roiUnits == UNIT_MM)    s = 0.001f;
+            if (roiUnits == UNIT_CM)    s = 0.01f;
+            if (roiUnits == UNIT_M)     s = 1.0f;
+            // if (roiUnits == UNIT_PCT)   s = 1.0f;
+
+            roiHeight = s*(roiHeight / yResolution);
+            roiWidth  = s*(roiWidth  / xResolution);
+
+            min_row = (long int) (ySize - roiHeight)/2.0;
+            max_row = (long int) ySize - min_row;   // forcing symmetry
+
+            min_col = (long int) (xSize - roiWidth)/2.0;
+            max_col = (long int) xSize - min_col;   // forcing symmetry
+        }
+        
+        // now we validate that ROI limits are within the range of the input image (avoid runtime exceptions)
+        if (min_col < 0) min_col = 0;
+        if (min_row < 0) min_row = 0;
+        if (max_col > xSize) max_col = xSize;
+        if (max_row > ySize) max_row = ySize;
+
+    }
+
     double nom_area = xSize*ySize*xResolution*yResolution;
     if (verbosity >= 1){
         logc.debug("geotiff", "geoTIFF summary information: *****************************************");
@@ -230,8 +268,9 @@ int main(int argc, char *argv[])
     // double z;    // too much overhead multithreading, not worth creating too many workers
     // #pragma omp for reduction(+:acum)
     chrono_start = high_resolution_clock::now();
-    for (int row = 0; row < ySize; row++){
-        for (int col = 0; col < xSize; col++){
+    // if ROI defined, then redefine the for-loop regions
+    for (int row = min_row; row < max_row; row++){
+        for (int col = min_col; col < max_col; col++){
             double z = apData[row][col];
             // z = apData[row][col];
             if (z != dfNoData && !isnan(z)){
