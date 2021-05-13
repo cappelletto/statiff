@@ -203,14 +203,16 @@ int main(int argc, char *argv[])
         double s = 1.0f; // scaling factor from [units] to [pixels]
 
         // image space is in pixels (apData matrix). We check if units are not in pixels as we could need to transform
-        if (roiUnits == UNIT_PIXEL){// no scaling required
-            min_row = (long int) (ySize - roiHeight)/2.0;
-            max_row = (long int) ySize - min_row;   // forcing symmetry
+        if (roiUnits == UNIT_PCT){// no scaling required
+            // min_row = (long int) (ySize - roiHeight)/2.0;
+            // max_row = (long int) ySize - min_row;   // forcing symmetry
 
-            min_col = (long int) (xSize - roiWidth)/2.0;
-            max_col = (long int) xSize - min_col;   // forcing symmetry
+            // min_col = (long int) (xSize - roiWidth)/2.0;
+            // max_col = (long int) xSize - min_col;   // forcing symmetry
+            roiHeight = ySize * roiHeight/100.0f;   //user-defined roiDim is the proportion (percentage) of the image canvas
+            roiWidth  = xSize * roiWidth/100.0f;
         }
-        else{
+        else if (roiUnits!= UNIT_PIXEL) {
             if (roiUnits == UNIT_MM)    s = 0.001f;
             if (roiUnits == UNIT_CM)    s = 0.01f;
             if (roiUnits == UNIT_M)     s = 1.0f;
@@ -219,12 +221,12 @@ int main(int argc, char *argv[])
             roiHeight = s*(roiHeight / yResolution);
             roiWidth  = s*(roiWidth  / xResolution);
 
-            min_row = (long int) (ySize - roiHeight)/2.0;
-            max_row = (long int) ySize - min_row;   // forcing symmetry
-
-            min_col = (long int) (xSize - roiWidth)/2.0;
-            max_col = (long int) xSize - min_col;   // forcing symmetry
         }
+        min_row = (long int) (ySize - roiHeight)/2.0;
+        max_row = (long int) ySize - min_row;   // forcing symmetry
+
+        min_col = (long int) (xSize - roiWidth)/2.0;
+        max_col = (long int) xSize - min_col;   // forcing symmetry
         
         // now we validate that ROI limits are within the range of the input image (avoid runtime exceptions)
         if (min_col < 0) min_col = 0;
